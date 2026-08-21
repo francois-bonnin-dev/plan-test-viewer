@@ -7,53 +7,7 @@
   <link rel="stylesheet" href="/styles.css" />
 </head>
 <body>
-  <header class="topbar">
-    <div class="brand">
-      <span class="brand-mark">CT</span>
-      <span class="brand-title">Plans de test</span>
-    </div>
-
-    <div class="folder-control">
-      <select id="folder-select" title="Dossiers de plans détectés dans le dépôt courant"></select>
-      <button id="folder-browse" class="btn-ghost" title="Choisir un dossier n'importe où sur le disque">Parcourir…</button>
-    </div>
-
-    <div class="search-control">
-      <input id="search" type="search" placeholder="Rechercher un ticket, un titre, un tag…" />
-    </div>
-
-    <button id="theme-toggle" class="theme-toggle" title="Changer de thème">🌓</button>
-  </header>
-
-  <div class="layout">
-    <aside class="sidebar" id="sidebar">
-      <div class="sidebar-empty" id="sidebar-empty">Chargement…</div>
-    </aside>
-
-    <main class="detail" id="detail">
-      <div class="detail-empty">Sélectionnez un plan de test à gauche.</div>
-    </main>
-  </div>
-
-  <div id="toast" class="toast" hidden></div>
-  <div id="case-backdrop" class="case-backdrop" hidden></div>
-  <div id="confetti-layer" class="confetti-layer" aria-hidden="true"></div>
-
-  <div id="browse-modal" class="modal-overlay" hidden>
-    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="browse-title">
-      <div class="modal-header">
-        <h2 id="browse-title">Choisir un dossier de plans de test</h2>
-        <button id="browse-close" class="modal-close" title="Fermer">✕</button>
-      </div>
-      <div id="browse-breadcrumb" class="breadcrumb"></div>
-      <div id="browse-list" class="browse-list"></div>
-      <div class="modal-footer">
-        <span id="browse-current" class="browse-current"></span>
-        <button id="browse-select" class="btn-primary">Sélectionner ce dossier</button>
-      </div>
-    </div>
-  </div>
-
-  <script src="/app.js"></script>
+  <div id="root"></div>
+  <script type="module" src="/build/app.js"></script>
 </body>
 </html>
