@@ -27,6 +27,7 @@ export interface DetailPaneProps {
   onToggleCase: (ctId: string, checked: boolean, originEl: HTMLElement, chapterKey: string) => void;
   onToast: (message: string, isError?: boolean) => void;
   scrollRef: RefObject<HTMLElement | null>;
+  onScroll: () => void;
 }
 
 export function DetailPane(props: DetailPaneProps) {
@@ -36,7 +37,7 @@ export function DetailPane(props: DetailPaneProps) {
 
   if (!plan) {
     return (
-      <main className="detail" ref={props.scrollRef}>
+      <main className="detail" ref={props.scrollRef} onScroll={props.onScroll}>
         <div className="detail-empty">Sélectionnez un plan de test à gauche.</div>
       </main>
     );
@@ -49,7 +50,7 @@ export function DetailPane(props: DetailPaneProps) {
   const zoomedGroup = zoomedRef ? getGroupByKey(plan, zoomedRef.chapterKey) : null;
 
   return (
-    <main className="detail" ref={props.scrollRef}>
+    <main className="detail" ref={props.scrollRef} onScroll={props.onScroll}>
       <div className="detail-inner">
         <Hero plan={plan} />
         <section className="plan-board">

@@ -154,6 +154,7 @@ export function App() {
           onToggleCase={plans.toggleCase}
           onToast={toast.show}
           scrollRef={scroll.ref}
+          onScroll={scroll.save}
         />
       </div>
 

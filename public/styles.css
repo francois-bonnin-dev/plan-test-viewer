@@ -84,6 +84,16 @@ body {
   flex-direction: column;
 }
 
+/* Le SPA monte sous #root, un niveau sous `body` : sans ces règles, la
+   chaîne flex `body -> .layout(flex:1) -> .detail(overflow-y:auto)` est
+   coupée et .detail grandit avec son contenu au lieu de scroller en interne. */
+#root {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
 /* ---------------------------------------------------------------- topbar */
 
 .topbar {
