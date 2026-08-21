@@ -3,6 +3,7 @@ import type { DiscoveredDir, Plan } from '../../../src/api-types.js';
 import { api } from '../api/client.js';
 import { applyToggle, isGroupComplete } from '../lib/apply-toggle.js';
 import { centerOf, spawnConfetti } from '../lib/confetti.js';
+import { writeLastDir } from '../lib/last-dir.js';
 import { getGroupByKey, groupCounts } from '../lib/plan-selectors.js';
 
 export interface UsePlansOptions {
@@ -24,9 +25,13 @@ export function usePlans(opts: UsePlansOptions) {
   const [error, setError] = useState<string | null>(null);
   const [pendingIds, setPendingIds] = useState<Set<string>>(new Set());
 
-  const loadDiscover = useCallback(async () => {
+  // Retourne la liste en plus de la publier dans le state : l'amorçage s'en
+  // sert comme dernier repli de dossier initial, avant même le premier rendu
+  // qui exposerait `discovered`.
+  const loadDiscover = useCallback(async (): Promise<DiscoveredDir[]> => {
     const res = await api.discover();
     setDiscovered(res.dirs);
+    return res.dirs;
   }, []);
 
   // Le plan demandé (préféré, typiquement lu depuis l'URL) prime s'il existe
@@ -43,6 +48,10 @@ export function usePlans(opts: UsePlansOptions) {
       setDir(res.dir);
       setPlans(res.plans);
       setActiveFile(wanted);
+      // Mémorisé seulement après un scan réussi, et sous sa forme absolue
+      // résolue par le serveur : un chemin invalide ne doit pas se réinstaller
+      // au prochain démarrage.
+      writeLastDir(res.dir);
       return { plans: res.plans, activeFile: wanted };
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);

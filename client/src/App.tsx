@@ -8,12 +8,13 @@ import { Toast } from './components/Toast.js';
 import { TopBar } from './components/TopBar.js';
 import { useBrowseModal } from './hooks/useBrowseModal.js';
 import { useCollapsedGroups } from './hooks/useCollapsedGroups.js';
-import { usePlans } from './hooks/usePlans.js';
+import { usePlans, type LoadDirResult } from './hooks/usePlans.js';
 import { useScrollPersistence } from './hooks/useScrollPersistence.js';
 import { useTheme } from './hooks/useTheme.js';
 import { useToast } from './hooks/useToast.js';
 import { useUrlState } from './hooks/useUrlState.js';
 import { useZoomedCase } from './hooks/useZoomedCase.js';
+import { readLastDir } from './lib/last-dir.js';
 import { findCase } from './lib/plan-selectors.js';
 
 export function App() {
@@ -39,18 +40,55 @@ export function App() {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const config = await api.config();
-      const targetDir = url.boot.dir ?? config.defaultDir;
-      await plans.loadDiscover();
-      const result = await plans.loadDir(targetDir, url.boot.plan);
-      if (cancelled) return;
+      try {
+        const config = await api.config();
+        // Un échec de la découverte n'alimente que le sélecteur de la barre du
+        // haut : il ne doit pas empêcher l'ouverture d'un plan.
+        const discovered = await plans.loadDiscover().catch(() => []);
+        if (cancelled) return;
 
-      const activePlanData = result.plans.find((p) => p.fileName === result.activeFile) ?? null;
-      const bootCt = url.boot.ct;
-      if (bootCt && activePlanData && findCase(activePlanData, bootCt)) {
-        zoomed.open(bootCt);
+        // Ordre de repli du dossier initial. L'URL prime — c'est elle qui porte
+        // un lien partagé comme un rechargement. Vient ensuite le dernier
+        // dossier réellement ouvert, qui survit à la fermeture de l'onglet,
+        // puis --dir, puis un dossier de plans détecté sous la racine du dépôt :
+        // sans ce dernier recours, un --dir inexistant laisse l'app vide alors
+        // que des plans sont visibles juste à côté.
+        const candidates = [url.boot.dir, readLastDir(), config.defaultDir, discovered[0]?.abs];
+
+        let loaded: LoadDirResult | null = null;
+        let lastError: unknown = null;
+        const tried = new Set<string>();
+        for (const candidate of candidates) {
+          if (!candidate || tried.has(candidate)) continue;
+          tried.add(candidate);
+          try {
+            loaded = await plans.loadDir(candidate, url.boot.plan);
+            break;
+          } catch (err) {
+            lastError = err; /* dossier absent ou illisible : on tente le suivant */
+          }
+        }
+        if (cancelled) return;
+
+        if (!loaded) {
+          const message = lastError instanceof Error ? lastError.message : String(lastError);
+          toast.show(`Aucun dossier de plans chargeable : ${message}`, true);
+          return;
+        }
+
+        const activePlanData = loaded.plans.find((p) => p.fileName === loaded.activeFile) ?? null;
+        const bootCt = url.boot.ct;
+        if (bootCt && activePlanData && findCase(activePlanData, bootCt)) {
+          zoomed.open(bootCt);
+        }
+      } finally {
+        // Toujours franchi, même quand aucun dossier n'a pu être chargé : c'est
+        // ce drapeau qui débloque l'écriture de l'URL. Le laisser à false sur
+        // échec gelait la synchronisation pour toute la session — le dossier
+        // ensuite choisi via « Parcourir » n'atteignait jamais l'URL et était
+        // donc perdu au rechargement.
+        if (!cancelled) setCaseOpened(true);
       }
-      setCaseOpened(true);
     })().catch((err) => {
       const message = err instanceof Error ? err.message : String(err);
       toast.show(`Erreur de chargement : ${message}`, true);

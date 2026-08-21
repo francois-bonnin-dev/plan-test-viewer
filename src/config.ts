@@ -26,9 +26,28 @@ function gitToplevel(dir: string): string {
   }
 }
 
+// Charge le .env du répertoire courant — celui du projet cible quand l'outil
+// est lancé depuis ailleurs, puisque c'est déjà lui qui sert de base à la
+// résolution des chemins relatifs. Node donne la priorité à l'environnement
+// déjà en place sur le contenu du fichier. Absent ou illisible, il n'y a rien
+// à faire : le fichier est un confort, pas une source de configuration requise.
+function loadEnvFile(cwd: string): void {
+  const envPath = path.join(cwd, '.env');
+  if (!existsSync(envPath)) return;
+  try {
+    process.loadEnvFile(envPath);
+  } catch {
+    /* syntaxe invalide ou lecture impossible : on garde l'environnement tel quel */
+  }
+}
+
+// Précédence, du plus fort au plus faible : option CLI, variable
+// d'environnement (fournie par le shell ou par le .env), valeur par défaut.
 export function resolveConfig(argv: string[], cwd: string): AppConfig {
+  loadEnvFile(cwd);
+
   const port = Number(argValue(argv, 'port', process.env.PORT ?? '4545'));
-  const defaultDir = argValue(argv, 'dir', 'docs/plans-de-test');
+  const defaultDir = argValue(argv, 'dir', process.env.DIR ?? 'docs/plans-de-test');
 
   const initialAbsDir = path.isAbsolute(defaultDir) ? defaultDir : path.resolve(cwd, defaultDir);
   const repoRoot = existsSync(initialAbsDir) ? gitToplevel(initialAbsDir) : gitToplevel(cwd);
