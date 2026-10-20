@@ -4,14 +4,6 @@ export function pctOf(stats: PlanStats): number {
   return stats.total ? Math.round((stats.checked / stats.total) * 100) : 0;
 }
 
-export interface LevelInfo {
-  level: number;
-}
-
-export function levelInfo(pct: number): LevelInfo {
-  return { level: Math.min(10, Math.floor(pct / 10)) };
-}
-
 export function groupCounts(cases: TestCase[]): { total: number; checked: number } {
   const total = cases.length;
   const checked = cases.filter((c) => c.checked).length;
@@ -71,6 +63,22 @@ export function buildCaseOrder(plan: Plan): CaseRef[] {
     for (const kase of plan.nonRegression.cases) order.push({ ctId: kase.id, chapterKey: 'non-reg' });
   }
   return order;
+}
+
+// Chapitres dont tous les cas sont validés : repliés par défaut à l'ouverture
+// d'un plan, pour que l'œil tombe directement sur ce qui reste à jouer.
+export function completedChapterKeys(plan: Plan | null): string[] {
+  if (!plan) return [];
+  const keys: string[] = [];
+  plan.groups.forEach((group, idx) => {
+    if (isComplete(group)) keys.push(`g${idx}`);
+  });
+  if (plan.nonRegression && isComplete(plan.nonRegression)) keys.push('non-reg');
+  return keys;
+}
+
+function isComplete(group: ChapterGroup): boolean {
+  return group.cases.length > 0 && group.cases.every((c) => c.checked);
 }
 
 export function getGroupByKey(plan: Plan, key: string): ChapterGroup | null {

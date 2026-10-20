@@ -3,6 +3,8 @@
 // produisent) ; le client l'importe par chemin relatif, sans copie ni cast —
 // voir client/src/api/guards.ts pour la validation runtime côté client.
 
+import type { PlanStatus } from './plan-status.js';
+
 export interface PlanMeta {
   type: string;
   ticket: string;
@@ -115,9 +117,25 @@ export interface ToggleRequestBody {
   checked: boolean;
 }
 
+// `status` : statut du plan après l'écriture — recalculé d'après l'avancement
+// (voir autoStatusFor), ou inchangé.
 export interface ToggleSuccessResponse {
   ok: true;
   stats: PlanStats;
+  status: string;
+}
+
+// Le statut envoyé est contraint au jeu partagé de src/plan-status.ts : le
+// serveur n'écrit dans le frontmatter que des valeurs connues.
+export interface SetStatusRequestBody {
+  dir: string;
+  file: string;
+  status: PlanStatus;
+}
+
+export interface SetStatusSuccessResponse {
+  ok: true;
+  status: PlanStatus;
 }
 
 export interface ApiErrorResponse {

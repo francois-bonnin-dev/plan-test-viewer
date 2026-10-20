@@ -4,7 +4,7 @@
 // "plan-de-test" (frontmatter `type: plan-de-test`, cas `- [ ] **CT-01 — ...**`).
 //
 // Lancer depuis le projet cible :
-//   node ~/projects/tools/plan-test-viewer/dist/server.js [--dir docs/plans-de-test] [--port 4545]
+//   node ~/projects/tools/plan-test-viewer/dist/server.js [--dir docs/test-plans] [--port 4545]
 // Les chemins relatifs (--dir, dossier choisi dans l'UI) se résolvent par
 // rapport au répertoire courant (process.cwd()), pas à l'emplacement du script.
 

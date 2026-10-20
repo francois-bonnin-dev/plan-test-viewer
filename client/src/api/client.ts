@@ -1,10 +1,11 @@
-import type { ToggleRequestBody } from '../../../src/api-types.js';
+import type { SetStatusRequestBody, ToggleRequestBody } from '../../../src/api-types.js';
 import {
   isBrowseResponse,
   isConfigResponse,
   isDiscoverResponse,
   isRecord,
   isScanResponse,
+  isSetStatusSuccessResponse,
   isToggleSuccessResponse,
 } from './guards.js';
 
@@ -30,6 +31,12 @@ export const api = {
   scan: (dir: string) => apiFetch(`/api/scan?dir=${encodeURIComponent(dir)}`, isScanResponse),
   toggle: (body: ToggleRequestBody) =>
     apiFetch('/api/toggle', isToggleSuccessResponse, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    }),
+  setStatus: (body: SetStatusRequestBody) =>
+    apiFetch('/api/status', isSetStatusSuccessResponse, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),

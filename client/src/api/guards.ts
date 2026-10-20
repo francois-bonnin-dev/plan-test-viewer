@@ -13,8 +13,10 @@ import type {
   DocTable,
   Plan,
   ScanResponse,
+  SetStatusSuccessResponse,
   ToggleSuccessResponse,
 } from '../../../src/api-types.js';
+import { isPlanStatus } from '../../../src/plan-status.js';
 
 export function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
@@ -122,5 +124,15 @@ export function isScanResponse(value: unknown): value is ScanResponse {
 export function isToggleSuccessResponse(value: unknown): value is ToggleSuccessResponse {
   if (!isRecord(value)) return false;
   if (value.ok !== true) return false;
-  return isRecord(value.stats) && typeof value.stats.total === 'number' && typeof value.stats.checked === 'number';
+  return (
+    isRecord(value.stats) &&
+    typeof value.stats.total === 'number' &&
+    typeof value.stats.checked === 'number' &&
+    typeof value.status === 'string'
+  );
+}
+
+export function isSetStatusSuccessResponse(value: unknown): value is SetStatusSuccessResponse {
+  if (!isRecord(value)) return false;
+  return value.ok === true && isPlanStatus(value.status);
 }

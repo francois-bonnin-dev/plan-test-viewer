@@ -1,15 +1,21 @@
 import type { Plan } from '../../../src/api-types.js';
-import { levelInfo, pctOf } from '../lib/plan-selectors.js';
-import { statusClass } from '../lib/status.js';
+import type { PlanStatus } from '../../../src/plan-status.js';
+import { pctOf } from '../lib/plan-selectors.js';
 import { CalloutView } from './CalloutView.js';
 import { DocTableView } from './DocTableView.js';
 import { FormattedText } from './FormattedText.js';
 import { InfoPanel } from './InfoPanel.js';
 import { Ring } from './Ring.js';
+import { StatusControl } from './StatusControl.js';
 
-export function Hero({ plan }: { plan: Plan }) {
+export interface HeroProps {
+  plan: Plan;
+  statusPending: boolean;
+  onSetStatus: (status: PlanStatus) => void;
+}
+
+export function Hero({ plan, statusPending, onSetStatus }: HeroProps) {
   const pct = pctOf(plan.stats);
-  const { level } = levelInfo(pct);
 
   const hasInfoLines = Boolean(plan.info.objet || plan.info.fonctionnalites || plan.info.horsPerimetre);
   const hasDetailsPanel = hasInfoLines || Boolean(plan.preRequis) || Boolean(plan.couverture);
@@ -22,7 +28,7 @@ export function Hero({ plan }: { plan: Plan }) {
           <h1>{plan.title}</h1>
           <div className="detail-badges">
             <span className="badge">{plan.meta.ticket}</span>
-            <span className={`status-pill ${statusClass(plan.meta.status)}`}>{plan.meta.status}</span>
+            <StatusControl status={plan.meta.status} pending={statusPending} onChange={onSetStatus} />
             <span className="badge">{plan.meta.domain}</span>
             <span className="badge">{plan.meta.date}</span>
             {plan.meta.tags.map((t) => (
@@ -34,21 +40,6 @@ export function Hero({ plan }: { plan: Plan }) {
         </div>
         <div className="hero-ring">
           <Ring pct={pct} size={88} stroke={8} label={`${pct}%`} />
-        </div>
-      </div>
-
-      <div className="xp-bar-wrap">
-        <div className="xp-level-chip">
-          Niveau {level} <span className="xp-level-max">/ 10</span>
-        </div>
-        <div className="xp-bar">
-          <div className="xp-bar-fill" style={{ width: `${pct}%` }} />
-          <span className="xp-rocket" style={{ left: `${pct}%` }}>
-            🚀
-          </span>
-        </div>
-        <div className="xp-count">
-          {plan.stats.checked}/{plan.stats.total} CT validés
         </div>
       </div>
 

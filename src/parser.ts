@@ -1,4 +1,4 @@
-// Parseur dédié au format "plan-de-test" (voir gabarit docs/_templates/plan-de-test.md
+// Parseur dédié au format "plan-de-test" (voir gabarit docs/_templates/test-plan.md
 // dans les projets qui l'utilisent). Volontairement spécifique à ce gabarit plutôt
 // qu'un parseur Markdown générique : le format est stable et documenté.
 //
@@ -20,7 +20,7 @@ const TABLE_SEP_RE = /^\|?[\s:|-]+\|?$/;
 const CALLOUT_RE = /^>\s*\[!(\w+)\]\s*(.*)$/;
 const KV_LINE_RE = /^([\w-]+):\s*(.*)$/;
 const LIST_ITEM_RE = /^\s*-\s+/;
-const PRECONDITION_PREFIX_RE = /^\*\*Pr[ée]-condition\*\*\s*[—-]\s*/i;
+const PRECONDITION_PREFIX_RE = /^\*\*Pr[ée]-condition\*\*\s*[:—-]\s*/i;
 
 // Un groupe de capture non optionnel dans le pattern (pas de `?`) est toujours
 // présent si `.match()` a réussi — mais `noUncheckedIndexedAccess` type quand
@@ -393,4 +393,30 @@ export function toggleCase(rawText: string, ctId: string, checked: boolean): str
   const lineRe = new RegExp(`^(- \\[)([ xX])(\\]\\s+\\*\\*${ctId}\\b)`, 'm');
   if (!lineRe.test(rawText)) return null;
   return rawText.replace(lineRe, `$1${marker}$3`);
+}
+
+// Même philosophie que toggleCase : patch textuel chirurgical du frontmatter.
+// Seule la ligne `status:` est réécrite (ou insérée si absente), le reste du
+// fichier — commentaires, ordre des clés, corps du document — reste intact.
+// Retourne null si le fichier n'a pas de frontmatter à patcher.
+const STATUS_LINE_RE = /^status:[^\n]*$/m;
+const FRONTMATTER_DELIMITER_RE = /^---\s*$/;
+
+function insertStatusLine(block: string, status: string): string {
+  const lines = block.split('\n');
+  // Le délimiteur ouvrant est la ligne 0 ; le premier suivant ferme le bloc.
+  const closingIdx = lines.findIndex((line, idx) => idx > 0 && FRONTMATTER_DELIMITER_RE.test(line));
+  if (closingIdx === -1) return block;
+  lines.splice(closingIdx, 0, `status: ${status}`);
+  return lines.join('\n');
+}
+
+export function setPlanStatus(rawText: string, status: string): string | null {
+  const m = rawText.match(FRONTMATTER_RE);
+  if (!m) return null;
+  const block = m[0];
+  const patched = STATUS_LINE_RE.test(block)
+    ? block.replace(STATUS_LINE_RE, `status: ${status}`)
+    : insertStatusLine(block, status);
+  return patched + rawText.slice(block.length);
 }

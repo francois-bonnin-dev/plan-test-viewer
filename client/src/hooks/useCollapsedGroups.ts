@@ -21,7 +21,16 @@ export function useCollapsedGroups() {
     });
   }, []);
 
-  const clear = useCallback(() => setCollapsed(new Set()), []);
+  const collapse = useCallback((key: string) => {
+    setCollapsed((prev) => {
+      if (prev.has(key)) return prev;
+      const next = new Set(prev);
+      next.add(key);
+      return next;
+    });
+  }, []);
 
-  return { collapsed, toggle, expand, clear };
+  const reset = useCallback((keys: Iterable<string>) => setCollapsed(new Set(keys)), []);
+
+  return { collapsed, toggle, expand, collapse, reset };
 }

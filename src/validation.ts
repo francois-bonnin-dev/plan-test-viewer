@@ -1,4 +1,5 @@
-import type { ToggleRequestBody } from './api-types.js';
+import type { SetStatusRequestBody, ToggleRequestBody } from './api-types.js';
+import { isPlanStatus } from './plan-status.js';
 
 export function isToggleRequestBody(value: unknown): value is ToggleRequestBody {
   if (typeof value !== 'object' || value === null) return false;
@@ -12,4 +13,10 @@ export function isToggleRequestBody(value: unknown): value is ToggleRequestBody 
     typeof value.ctId === 'string' &&
     typeof value.checked === 'boolean'
   );
+}
+
+export function isSetStatusRequestBody(value: unknown): value is SetStatusRequestBody {
+  if (typeof value !== 'object' || value === null) return false;
+  if (!('dir' in value) || !('file' in value) || !('status' in value)) return false;
+  return typeof value.dir === 'string' && typeof value.file === 'string' && isPlanStatus(value.status);
 }

@@ -39,20 +39,27 @@ export function Chapter(props: ChapterProps) {
           <Ring pct={pct} size={38} stroke={4} label={`${checked}/${total}`} />
         </span>
       </header>
-      <div className="case-grid">
-        {group.cases.map((kase) => {
-          const rows = anomalies.get(kase.id);
-          return (
-            <CaseCard
-              key={kase.id}
-              kase={kase}
-              hasAnomaly={Boolean(rows && rows.length > 0)}
-              pending={pendingIds.has(kase.id)}
-              onOpen={() => onOpenCase(kase.id)}
-              onToggle={(checked, stampEl) => onToggleCase(kase.id, checked, stampEl, chapterKey)}
-            />
-          );
-        })}
+      {/* Repli animé : .chapter-body anime grid-template-rows (1fr ↔ 0fr), ce
+          qu'une hauteur `auto` ne permet pas ; .chapter-clip coupe le contenu
+          pendant la transition. */}
+      <div className="chapter-body">
+        <div className="chapter-clip">
+          <div className="case-grid">
+            {group.cases.map((kase) => {
+              const rows = anomalies.get(kase.id);
+              return (
+                <CaseCard
+                  key={kase.id}
+                  kase={kase}
+                  hasAnomaly={Boolean(rows && rows.length > 0)}
+                  pending={pendingIds.has(kase.id)}
+                  onOpen={() => onOpenCase(kase.id)}
+                  onToggle={(checked, stampEl) => onToggleCase(kase.id, checked, stampEl, chapterKey)}
+                />
+              );
+            })}
+          </div>
+        </div>
       </div>
     </section>
   );

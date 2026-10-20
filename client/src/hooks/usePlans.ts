@@ -1,5 +1,6 @@
 import { useCallback, useState } from 'hono/jsx';
 import type { DiscoveredDir, Plan } from '../../../src/api-types.js';
+import type { PlanStatus } from '../../../src/plan-status.js';
 import { api } from '../api/client.js';
 import { applyToggle, isGroupComplete } from '../lib/apply-toggle.js';
 import { centerOf, spawnConfetti } from '../lib/confetti.js';
@@ -9,6 +10,11 @@ import { getGroupByKey, groupCounts } from '../lib/plan-selectors.js';
 export interface UsePlansOptions {
   onToast: (message: string, isError?: boolean) => void;
   confettiLayerRef: { current: HTMLElement | null };
+  onChapterComplete: (chapterKey: string) => void;
+  // Appelé dans le même tour synchrone que le changement de plan actif : l'état
+  // qui en dépend (chapitres repliés) part ainsi dans le même rendu que le plan,
+  // au lieu d'arriver un rendu plus tard et de déclencher les animations.
+  onPlanOpened: (plan: Plan | null) => void;
 }
 
 export interface LoadDirResult {
@@ -24,6 +30,7 @@ export function usePlans(opts: UsePlansOptions) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pendingIds, setPendingIds] = useState<Set<string>>(new Set());
+  const [statusPending, setStatusPending] = useState(false);
 
   // Retourne la liste en plus de la publier dans le state : l'amorçage s'en
   // sert comme dernier repli de dossier initial, avant même le premier rendu
@@ -48,6 +55,7 @@ export function usePlans(opts: UsePlansOptions) {
       setDir(res.dir);
       setPlans(res.plans);
       setActiveFile(wanted);
+      opts.onPlanOpened(res.plans.find((p) => p.fileName === wanted) ?? null);
       // Mémorisé seulement après un scan réussi, et sous sa forme absolue
       // résolue par le serveur : un chemin invalide ne doit pas se réinstaller
       // au prochain démarrage.
@@ -60,11 +68,15 @@ export function usePlans(opts: UsePlansOptions) {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [opts]);
 
-  const selectPlan = useCallback((fileName: string) => {
-    setActiveFile(fileName);
-  }, []);
+  const selectPlan = useCallback(
+    (fileName: string) => {
+      setActiveFile(fileName);
+      opts.onPlanOpened(plans.find((p) => p.fileName === fileName) ?? null);
+    },
+    [plans, opts]
+  );
 
   const toggleCase = useCallback(
     async (ctId: string, checked: boolean, originEl: HTMLElement, chapterKey: string | null): Promise<void> => {
@@ -89,8 +101,10 @@ export function usePlans(opts: UsePlansOptions) {
 
       try {
         const res = await api.toggle({ dir, file: currentPlan.fileName, ctId, checked });
-        const updatedPlan = applyToggle(currentPlan, ctId, checked, res.stats);
+        const updatedPlan = applyToggle(currentPlan, ctId, checked, res.stats, res.status);
         setPlans((prev) => prev.map((p) => (p.fileName === currentPlan.fileName ? updatedPlan : p)));
+        const statusNote =
+          res.status !== currentPlan.meta.status ? ` · statut passé à « ${res.status} »` : '';
 
         if (checked) {
           const { x, y } = centerOf(originEl);
@@ -107,7 +121,8 @@ export function usePlans(opts: UsePlansOptions) {
               const pos = centerOf(header);
               spawnConfetti(opts.confettiLayerRef.current, pos.x, pos.y, { count: 28, big: true });
             }
-            opts.onToast(`Chapitre « ${groupAfter.title} » terminé !`);
+            opts.onToast(`Chapitre « ${groupAfter.title} » terminé !${statusNote}`);
+            if (chapterKey) opts.onChapterComplete(chapterKey);
           }
 
           const nowPlanComplete = isGroupComplete({ total: updatedPlan.stats.total, checked: updatedPlan.stats.checked });
@@ -119,12 +134,12 @@ export function usePlans(opts: UsePlansOptions) {
                 spread: 200,
               });
             }
-            opts.onToast(`Plan « ${updatedPlan.title} » terminé à 100 % !`);
+            opts.onToast(`Plan « ${updatedPlan.title} » terminé à 100 % !${statusNote}`);
           } else if (!chapterJustCompleted) {
-            opts.onToast(`${ctId} validé — enregistré dans ${currentPlan.fileName}`);
+            opts.onToast(`${ctId} validé — enregistré dans ${currentPlan.fileName}${statusNote}`);
           }
         } else {
-          opts.onToast(`${ctId} remis à refaire — enregistré dans ${currentPlan.fileName}`);
+          opts.onToast(`${ctId} remis à refaire — enregistré dans ${currentPlan.fileName}${statusNote}`);
         }
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
@@ -135,6 +150,35 @@ export function usePlans(opts: UsePlansOptions) {
           next.delete(ctId);
           return next;
         });
+      }
+    },
+    [plans, activeFile, dir, opts]
+  );
+
+  // Écrit le frontmatter `status:` du plan actif, puis recopie la valeur
+  // retournée par le serveur dans le state — même mise à jour immuable ciblée
+  // que toggleCase, sans re-scan du dossier : le fichier vient d'être réécrit
+  // par un patch chirurgical, rien d'autre n'a bougé.
+  const setStatus = useCallback(
+    async (status: PlanStatus): Promise<void> => {
+      const currentPlan = plans.find((p) => p.fileName === activeFile);
+      if (!currentPlan || !dir) return;
+      if (currentPlan.meta.status === status) return;
+
+      setStatusPending(true);
+      try {
+        const res = await api.setStatus({ dir, file: currentPlan.fileName, status });
+        setPlans((prev) =>
+          prev.map((p) =>
+            p.fileName === currentPlan.fileName ? { ...p, meta: { ...p.meta, status: res.status } } : p
+          )
+        );
+        opts.onToast(`Statut « ${res.status} » enregistré dans ${currentPlan.fileName}`);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        opts.onToast(`Échec de l'enregistrement du statut : ${message}`, true);
+      } finally {
+        setStatusPending(false);
       }
     },
     [plans, activeFile, dir, opts]
@@ -151,9 +195,11 @@ export function usePlans(opts: UsePlansOptions) {
     loading,
     error,
     pendingIds,
+    statusPending,
     loadDiscover,
     loadDir,
     selectPlan,
     toggleCase,
+    setStatus,
   };
 }

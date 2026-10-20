@@ -47,7 +47,7 @@ export function resolveConfig(argv: string[], cwd: string): AppConfig {
   loadEnvFile(cwd);
 
   const port = Number(argValue(argv, 'port', process.env.PORT ?? '4545'));
-  const defaultDir = argValue(argv, 'dir', process.env.DIR ?? 'docs/plans-de-test');
+  const defaultDir = argValue(argv, 'dir', process.env.DIR ?? 'docs/test-plans');
 
   const initialAbsDir = path.isAbsolute(defaultDir) ? defaultDir : path.resolve(cwd, defaultDir);
   const repoRoot = existsSync(initialAbsDir) ? gitToplevel(initialAbsDir) : gitToplevel(cwd);

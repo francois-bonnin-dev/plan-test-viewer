@@ -1,6 +1,7 @@
 import { useMemo } from 'hono/jsx';
 import type { RefObject } from 'hono/jsx';
 import type { Plan } from '../../../src/api-types.js';
+import type { PlanStatus } from '../../../src/plan-status.js';
 import type { NavDirection } from '../hooks/useZoomedCase.js';
 import { anomaliesByCase, buildCaseOrder, findCase, getGroupByKey } from '../lib/plan-selectors.js';
 import { Chapter } from './Chapter.js';
@@ -25,6 +26,8 @@ export interface DetailPaneProps {
   zoomed: ZoomedInfo;
   pendingIds: Set<string>;
   onToggleCase: (ctId: string, checked: boolean, originEl: HTMLElement, chapterKey: string) => void;
+  statusPending: boolean;
+  onSetStatus: (status: PlanStatus) => void;
   onToast: (message: string, isError?: boolean) => void;
   scrollRef: RefObject<HTMLElement | null>;
   onScroll: () => void;
@@ -52,8 +55,10 @@ export function DetailPane(props: DetailPaneProps) {
   return (
     <main className="detail" ref={props.scrollRef} onScroll={props.onScroll}>
       <div className="detail-inner">
-        <Hero plan={plan} />
-        <section className="plan-board">
+        <Hero plan={plan} statusPending={props.statusPending} onSetStatus={props.onSetStatus} />
+        {/* key : un autre plan remonte ses chapitres au lieu de recycler ceux
+            du précédent — sans quoi g0 replié ici / déplié là s'animerait. */}
+        <section className="plan-board" key={plan.fileName}>
           {plan.groups.map((group, idx) => (
             <Chapter
               key={`g${idx}`}

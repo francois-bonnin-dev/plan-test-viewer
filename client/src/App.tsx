@@ -8,14 +8,20 @@ import { Toast } from './components/Toast.js';
 import { TopBar } from './components/TopBar.js';
 import { useBrowseModal } from './hooks/useBrowseModal.js';
 import { useCollapsedGroups } from './hooks/useCollapsedGroups.js';
+import { usePlanFilters } from './hooks/usePlanFilters.js';
 import { usePlans, type LoadDirResult } from './hooks/usePlans.js';
 import { useScrollPersistence } from './hooks/useScrollPersistence.js';
+import { useSidebar } from './hooks/useSidebar.js';
 import { useTheme } from './hooks/useTheme.js';
 import { useToast } from './hooks/useToast.js';
 import { useUrlState } from './hooks/useUrlState.js';
 import { useZoomedCase } from './hooks/useZoomedCase.js';
 import { readLastDir } from './lib/last-dir.js';
-import { findCase } from './lib/plan-selectors.js';
+import { buildCaseOrder, completedChapterKeys } from './lib/plan-selectors.js';
+
+// Laisse le temps de voir le dernier cas passer au vert et les confettis
+// partir de l'en-tête avant que la grille ne disparaisse sous le curseur.
+const AUTO_COLLAPSE_DELAY_MS = 700;
 
 export function App() {
   const theme = useTheme();
@@ -23,11 +29,27 @@ export function App() {
   const url = useUrlState();
   const collapsed = useCollapsedGroups();
   const confettiLayerRef = useRef<HTMLDivElement | null>(null);
-  const plans = usePlans({ onToast: toast.show, confettiLayerRef });
+  // Plan actif au moment où le délai de repli expire : les clés de chapitre
+  // (g0, g1…) se répètent d'un plan à l'autre, un changement de plan entre-temps
+  // ne doit pas replier le chapitre homonyme du nouveau plan.
+  const activeFileRef = useRef<string | null>(null);
+  const plans = usePlans({
+    onToast: toast.show,
+    confettiLayerRef,
+    onChapterComplete: (chapterKey) => {
+      const fileAtCompletion = activeFileRef.current;
+      window.setTimeout(() => {
+        if (activeFileRef.current === fileAtCompletion) collapsed.collapse(chapterKey);
+      }, AUTO_COLLAPSE_DELAY_MS);
+    },
+    onPlanOpened: (plan) => collapsed.reset(completedChapterKeys(plan)),
+  });
+  activeFileRef.current = plans.activeFile;
   const zoomed = useZoomedCase(plans.activePlan, collapsed.expand);
   const browse = useBrowseModal({ onToast: toast.show });
   const scroll = useScrollPersistence(plans.dir, plans.activeFile);
-  const [query, setQuery] = useState('');
+  const filters = usePlanFilters(plans.plans);
+  const sidebar = useSidebar();
 
   // Chargement initial en deux étapes plutôt qu'un requestAnimationFrame :
   // ouvrir le cas demandé par l'URL déclenche un re-rendu (dépli éventuel du
@@ -78,8 +100,13 @@ export function App() {
 
         const activePlanData = loaded.plans.find((p) => p.fileName === loaded.activeFile) ?? null;
         const bootCt = url.boot.ct;
-        if (bootCt && activePlanData && findCase(activePlanData, bootCt)) {
-          zoomed.open(bootCt);
+        const bootCase = bootCt && activePlanData ? buildCaseOrder(activePlanData).find((r) => r.ctId === bootCt) : undefined;
+        // Dépli explicite du chapitre du cas demandé par l'URL : zoomed.open ne
+        // peut pas s'en charger, son ordre des cas est encore celui du rendu
+        // précédent le chargement (vide).
+        if (bootCase) {
+          collapsed.expand(bootCase.chapterKey);
+          zoomed.open(bootCase.ctId);
         }
       } finally {
         // Toujours franchi, même quand aucun dossier n'a pu être chargé : c'est
@@ -120,19 +147,20 @@ export function App() {
       if (ev.key !== 'Escape') return;
       if (browse.isOpen) browse.close();
       else if (zoomed.zoomedCtId) zoomed.close();
+      else if (sidebar.isDrawer && sidebar.isOpen) sidebar.closeDrawer();
     }
     document.addEventListener('keydown', onKeyDown);
     return () => document.removeEventListener('keydown', onKeyDown);
-  }, [browse.isOpen, zoomed.zoomedCtId]);
+  }, [browse.isOpen, zoomed.zoomedCtId, sidebar.isDrawer, sidebar.isOpen]);
 
   const handleSelectPlan = useCallback(
     (fileName: string) => {
       zoomed.close();
-      collapsed.clear();
       plans.selectPlan(fileName);
       scroll.resetTop();
+      sidebar.closeDrawer();
     },
-    [plans, zoomed, collapsed, scroll]
+    [plans, zoomed, scroll, sidebar]
   );
 
   const handleSelectDir = useCallback(
@@ -169,19 +197,23 @@ export function App() {
         discovered={plans.discovered}
         onSelectDir={(dir) => void handleSelectDir(dir)}
         onBrowse={handleBrowse}
-        query={query}
-        onQueryChange={setQuery}
+        sidebarOpen={sidebar.isOpen}
+        onToggleSidebar={sidebar.toggle}
         onToggleTheme={theme.cycle}
       />
       <div className="layout">
         <Sidebar
           plans={plans.plans}
+          dir={plans.dir}
           activeFile={plans.activeFile}
           loading={plans.loading}
           error={plans.error}
-          query={query}
+          filters={filters}
+          open={sidebar.isOpen}
+          onClose={sidebar.close}
           onSelect={handleSelectPlan}
         />
+        {sidebar.isDrawer && sidebar.isOpen && <div className="sidebar-backdrop" onClick={sidebar.closeDrawer} />}
         <DetailPane
           plan={plans.activePlan}
           collapsed={collapsed.collapsed}
@@ -190,6 +222,8 @@ export function App() {
           zoomed={zoomed}
           pendingIds={plans.pendingIds}
           onToggleCase={plans.toggleCase}
+          statusPending={plans.statusPending}
+          onSetStatus={(status) => void plans.setStatus(status)}
           onToast={toast.show}
           scrollRef={scroll.ref}
           onScroll={scroll.save}
